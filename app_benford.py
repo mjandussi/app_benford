@@ -3,6 +3,9 @@ import collections
 import math
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 
 ######## CONFIG ###########
@@ -82,175 +85,353 @@ def analises():
         df['Natureza'] = df['Natureza'].astype(str).str.replace(r'\.0$', '', regex=True)
         with st.expander("Expandir Dataframe"):
             st.write(df)
+
+        # Perguntar ao usuário se deseja modificar o DataFrame
+        modificar_df = st.checkbox("DESEJA FILTRAR POR ND?")
     
+        if modificar_df:
+            # Obter as opções únicas de "Natureza"
+            naturezas_unicas = df['Natureza'].unique()
+            
+            # Permitir que o usuário selecione as "Naturezas" que deseja analisar
+            naturezas_selecionadas = st.multiselect("Selecione as Naturezas para filtrar", options=naturezas_unicas)
+            
+            # Filtrar o DataFrame com base nas "Naturezas" selecionadas
+            if naturezas_selecionadas:
+                df = df[df['Natureza'].isin(naturezas_selecionadas)]
+                st.write("DataFrame Filtrado:")
+    
+                #############################################################################################################################3
 
-        #############################################################################################################################3
+                # Passando a coluna Valor como uma lista
+                distribution = calculate_first_digit_distribution(df['Valor'])
+                benford_distribution = benford_law_distribution()
 
-        # Passando a coluna Valor como uma lista
-        distribution = calculate_first_digit_distribution(df['Valor'])
-        benford_distribution = benford_law_distribution()
+                # Criar três colunas
+                col1, col2, col3 = st.columns(3)
 
-        # Criar três colunas
-        col1, col2, col3 = st.columns(3)
+                # Tabela de distribuição observada
+                with col1:
+                    st.subheader("Distribuição Observada nos Dados")
+                    observed_data = {"Dígito": [], "Distribuição Observada": []}
+                    for digit in range(1, 10):
+                        observed_data["Dígito"].append(digit)
+                        observed_data["Distribuição Observada"].append(f"{distribution.get(str(digit), 0):.2%}")
+                    observed_df = pd.DataFrame(observed_data)
+                    st.table(observed_df)
 
-        # Tabela de distribuição observada
-        with col1:
-            st.subheader("Distribuição Observada nos Dados")
-            observed_data = {"Dígito": [], "Distribuição Observada": []}
-            for digit in range(1, 10):
-                observed_data["Dígito"].append(digit)
-                observed_data["Distribuição Observada"].append(f"{distribution.get(str(digit), 0):.2%}")
-            observed_df = pd.DataFrame(observed_data)
-            st.table(observed_df)
+                # Tabela de distribuição esperada pela Lei de Benford
+                with col2:
+                    st.subheader("Distribuição Esperada pela Lei de Benford")
+                    expected_data = {"Dígito": [], "Distribuição Esperada": []}
+                    for digit, expected in enumerate(benford_distribution, start=1):
+                        expected_data["Dígito"].append(digit)
+                        expected_data["Distribuição Esperada"].append(f"{expected:.2%}")
+                    expected_df = pd.DataFrame(expected_data)
+                    st.table(expected_df)
 
-        # Tabela de distribuição esperada pela Lei de Benford
-        with col2:
-            st.subheader("Distribuição Esperada pela Lei de Benford")
-            expected_data = {"Dígito": [], "Distribuição Esperada": []}
-            for digit, expected in enumerate(benford_distribution, start=1):
-                expected_data["Dígito"].append(digit)
-                expected_data["Distribuição Esperada"].append(f"{expected:.2%}")
-            expected_df = pd.DataFrame(expected_data)
-            st.table(expected_df)
+                # Tabela de diferenças
+                with col3:
+                    st.subheader("Diferença entre Distribuições")
+                    differences_data = {"Dígito": [], "Diferença": []}
+                    differences = {digit: distribution.get(str(digit), 0) - benford_distribution[digit - 1] for digit in range(1, 10)}
+                    for digit in range(1, 10):
+                        differences_data["Dígito"].append(digit)
+                        differences_data["Diferença"].append(f"{differences[digit]:+.2%}")
+                    differences_df = pd.DataFrame(differences_data)
+                    st.table(differences_df)
 
-        # Tabela de diferenças
-        with col3:
-            st.subheader("Diferença entre Distribuições")
-            differences_data = {"Dígito": [], "Diferença": []}
-            differences = {digit: distribution.get(str(digit), 0) - benford_distribution[digit - 1] for digit in range(1, 10)}
-            for digit in range(1, 10):
-                differences_data["Dígito"].append(digit)
-                differences_data["Diferença"].append(f"{differences[digit]:+.2%}")
-            differences_df = pd.DataFrame(differences_data)
-            st.table(differences_df)
+                st.divider()
 
-        st.divider()
+                ###################################################################################################################33
+                # Preparando os dados para o gráfico
+                digits = list(range(1, 10))
+                distribution_values = [distribution.get(str(digit), 0) for digit in digits]
+                benford_values = benford_distribution
 
+                # Criando o gráfico
+                plt.figure(figsize=(10, 6))
+                bar_width = 0.35
+                index = range(len(digits))
 
-        ###################################################################################################################33
-        # Preparando os dados para o gráfico
-        digits = list(range(1, 10))
-        distribution_values = [distribution.get(str(digit), 0) for digit in digits]
-        benford_values = benford_distribution
+                # Barras para a distribuição dos dados
+                plt.bar(index, distribution_values, bar_width, label='Dados', alpha=0.7, color='b')
 
-        # Criando o gráfico
-        plt.figure(figsize=(10, 6))
-        bar_width = 0.35
-        index = range(len(digits))
+                # Linha para a distribuição esperada pela Lei de Benford
+                plt.plot(index, benford_values, label='Benford', color='r', marker='o', linestyle='--')
 
-        # Barras para a distribuição dos dados
-        plt.bar(index, distribution_values, bar_width, label='Dados', alpha=0.7, color='b')
+                # Configurações do gráfico
+                plt.xlabel('Dígitos')
+                plt.ylabel('Frequência')
+                plt.title('Comparação da Distribuição dos Dígitos Iniciais')
+                plt.xticks(index, digits)
+                plt.legend()
 
-        # Linha para a distribuição esperada pela Lei de Benford
-        plt.plot(index, benford_values, label='Benford', color='r', marker='o', linestyle='--')
+                # Ajuste do layout
+                plt.tight_layout()
 
-        # Configurações do gráfico
-        plt.xlabel('Dígitos')
-        plt.ylabel('Frequência')
-        plt.title('Comparação da Distribuição dos Dígitos Iniciais')
-        plt.xticks(index, digits)
-        plt.legend()
+                # Exibindo o gráfico no Streamlit
+                st.pyplot(plt)
 
-        # Ajuste do layout
-        plt.tight_layout()
+                st.divider()
 
-        # Exibindo o gráfico no Streamlit
-        st.pyplot(plt)
+                ################################################################################################3
 
-        st.divider()
+                corte = st.selectbox("Escolha o corte para as repetições", [5, 10, 15, 20])
 
+                st.write('### Contagem por tipo')
+                # Criar colunas
+                col1, col2, col3 = st.columns(3)
 
-        ################################################################################################3
+                with col1:
+                    with st.expander(f'{corte} - Valores mais repetidos'):
+                        contagem_valores = df['Valor'].value_counts().reset_index().sort_values(by="count", ascending=False)
+                        st.write(f"Contagem dos {corte} Valores Mais Repetidos")
+                        st.write(contagem_valores.head(corte))
 
-        corte = st.selectbox("Escolha o corte para as repetições", [5, 10, 15, 20])
+                with col2:
+                    with st.expander(f'{corte} - Credores mais repetidos'):
+                        contagem_valores = df['Nome do Credor'].value_counts().reset_index().sort_values(by="count", ascending=False)
+                        st.write(f"Contagem dos {corte} Credores Mais Repetidos")
+                        st.write(contagem_valores.head(corte))
+                
+                with col3:
+                    with st.expander(f'{corte} - NDs mais repetidos'):
+                        contagem_valores = df['Natureza'].value_counts().reset_index().sort_values(by="count", ascending=False)
+                        st.write(f"Contagem dos {corte} NDs Mais Repetidas")
+                        st.write(contagem_valores.head(corte))
 
-        st.write('### Contagem por tipo')
-        # Criar colunas
-        col1, col2, col3 = st.columns(3)
+            
+                st.divider()
 
-        with col1:
-            with st.expander(f'{corte} - Valores mais repetidos'):
-                contagem_valores = df['Valor'].value_counts().reset_index().sort_values(by="count", ascending=False)
-                st.write(f"Contagem dos {corte} Valores Mais Repetidos")
-                st.write(contagem_valores.head(corte))
+                st.write('### Análise Por Totais')
+                # Criar colunas
+                col1, col2 = st.columns([3,2])
 
-        with col2:
-            with st.expander(f'{corte} - Credores mais repetidos'):
-                contagem_valores = df['Nome do Credor'].value_counts().reset_index().sort_values(by="count", ascending=False)
-                st.write(f"Contagem dos {corte} Credores Mais Repetidos")
-                st.write(contagem_valores.head(corte))
+                # Tabela de distribuição observada
+                with col1:
+                    with st.expander('Soma dos Valores por Credor'):
+                        soma_credor = df.groupby('Nome do Credor')['Valor'].sum().reset_index().sort_values(by="Valor", ascending=False)
+                        st.write("### Soma dos Valores por Credor")
+                        st.write(soma_credor)
+
+                # Tabela de distribuição esperada pela Lei de Benford
+                with col2:
+                    with st.expander('Soma dos Valores por Natureza'):
+                        soma_nd = df.groupby('Natureza')['Valor'].sum().reset_index().sort_values(by="Valor", ascending=False)
+                        st.write("### Soma dos Valores por Natureza")
+                        st.write(soma_nd)
+
+                st.divider()
+                
+                ################################################################################################################################
+                # Criando uma coluna cópia
+                df['valores'] = df['Valor']
+                # Converter os valores float para string
+                df['valores_str'] = df['valores'].astype(str)
+                df['valores_str'] = df['valores_str'].astype(str).str.replace(r'\.0$', '', regex=True)
+
+                ########################################################################################################################333333
+                # Criar um selectbox para escolher o dígito inicial
+                st.write('### Análise da Distribuição dos Valores por Dígito')
+                digito_inicial = st.selectbox('Escolha o dígito inicial para análise', [str(i) for i in range(1, 10)])
+
+                # Filtrar valores que começam com o dígito selecionado
+                filtro_digito = df['valores_str'].str.startswith(digito_inicial)
+                valores_comecam_com_digito = df[filtro_digito]
+
+                valores_digito = valores_comecam_com_digito['Valor']
+
+                # Definir intervalos dinamicamente com base no dígito inicial
+                base = int(digito_inicial)
+                intervalos = [(base * 10**i, (base + 1) * 10**i) for i in range(7)]  # Ajustar para incluir o valor final
+
+                # Criar histogramas separados para cada segmento
+                fig, axs = plt.subplots(len(intervalos) - 1, 1, figsize=(8, 4 * (len(intervalos) - 1)))
+
+                for i, (inicio, fim) in enumerate(intervalos):
+                    if inicio == 1 and fim == 10:
+                        continue  # Pular o intervalo de 1 a 9
+
+                    valores_intervalo = [valor for valor in valores_digito if inicio <= valor < fim]
+                    # Calcular o passo do range, garantindo que não seja zero
+                    step = max((fim - inicio) // 10, 1)
+                    if valores_intervalo:  # Verificar se há valores para plotar
+                        axs[i - 1].hist(valores_intervalo, bins=range(int(inicio), int(fim) + 1, step), color='skyblue', edgecolor='black', alpha=0.7)
+                        axs[i - 1].set_title(f'Valores entre {inicio} e {fim - 1}')
+                        axs[i - 1].set(xlabel='Valor do Empenho', ylabel='Frequência')
+                        axs[i - 1].yaxis.get_major_locator().set_params(integer=True)
+
+                plt.tight_layout()
+
+                # Exibir o gráfico no Streamlit
+                st.pyplot(fig)
+
+        else:
+            # Passando a coluna Valor como uma lista
+            distribution = calculate_first_digit_distribution(df['Valor'])
+            benford_distribution = benford_law_distribution()
+
+            # Criar três colunas
+            col1, col2, col3 = st.columns(3)
+
+            # Tabela de distribuição observada
+            with col1:
+                st.subheader("Distribuição Observada nos Dados")
+                observed_data = {"Dígito": [], "Distribuição Observada": []}
+                for digit in range(1, 10):
+                    observed_data["Dígito"].append(digit)
+                    observed_data["Distribuição Observada"].append(f"{distribution.get(str(digit), 0):.2%}")
+                observed_df = pd.DataFrame(observed_data)
+                st.table(observed_df)
+
+            # Tabela de distribuição esperada pela Lei de Benford
+            with col2:
+                st.subheader("Distribuição Esperada pela Lei de Benford")
+                expected_data = {"Dígito": [], "Distribuição Esperada": []}
+                for digit, expected in enumerate(benford_distribution, start=1):
+                    expected_data["Dígito"].append(digit)
+                    expected_data["Distribuição Esperada"].append(f"{expected:.2%}")
+                expected_df = pd.DataFrame(expected_data)
+                st.table(expected_df)
+
+            # Tabela de diferenças
+            with col3:
+                st.subheader("Diferença entre Distribuições")
+                differences_data = {"Dígito": [], "Diferença": []}
+                differences = {digit: distribution.get(str(digit), 0) - benford_distribution[digit - 1] for digit in range(1, 10)}
+                for digit in range(1, 10):
+                    differences_data["Dígito"].append(digit)
+                    differences_data["Diferença"].append(f"{differences[digit]:+.2%}")
+                differences_df = pd.DataFrame(differences_data)
+                st.table(differences_df)
+
+            st.divider()
+
+            ###################################################################################################################33
+            # Preparando os dados para o gráfico
+            digits = list(range(1, 10))
+            distribution_values = [distribution.get(str(digit), 0) for digit in digits]
+            benford_values = benford_distribution
+
+            # Criando o gráfico
+            plt.figure(figsize=(10, 6))
+            bar_width = 0.35
+            index = range(len(digits))
+
+            # Barras para a distribuição dos dados
+            plt.bar(index, distribution_values, bar_width, label='Dados', alpha=0.7, color='b')
+
+            # Linha para a distribuição esperada pela Lei de Benford
+            plt.plot(index, benford_values, label='Benford', color='r', marker='o', linestyle='--')
+
+            # Configurações do gráfico
+            plt.xlabel('Dígitos')
+            plt.ylabel('Frequência')
+            plt.title('Comparação da Distribuição dos Dígitos Iniciais')
+            plt.xticks(index, digits)
+            plt.legend()
+
+            # Ajuste do layout
+            plt.tight_layout()
+
+            # Exibindo o gráfico no Streamlit
+            st.pyplot(plt)
+
+            st.divider()
+
+            ################################################################################################3
+
+            corte = st.selectbox("Escolha o corte para as repetições", [5, 10, 15, 20])
+
+            st.write('### Contagem por tipo')
+            # Criar colunas
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                with st.expander(f'{corte} - Valores mais repetidos'):
+                    contagem_valores = df['Valor'].value_counts().reset_index().sort_values(by="count", ascending=False)
+                    st.write(f"Contagem dos {corte} Valores Mais Repetidos")
+                    st.write(contagem_valores.head(corte))
+
+            with col2:
+                with st.expander(f'{corte} - Credores mais repetidos'):
+                    contagem_valores = df['Nome do Credor'].value_counts().reset_index().sort_values(by="count", ascending=False)
+                    st.write(f"Contagem dos {corte} Credores Mais Repetidos")
+                    st.write(contagem_valores.head(corte))
+            
+            with col3:
+                with st.expander(f'{corte} - NDs mais repetidos'):
+                    contagem_valores = df['Natureza'].value_counts().reset_index().sort_values(by="count", ascending=False)
+                    st.write(f"Contagem dos {corte} NDs Mais Repetidas")
+                    st.write(contagem_valores.head(corte))
+
         
-        with col3:
-            with st.expander(f'{corte} - NDs mais repetidos'):
-                contagem_valores = df['Natureza'].value_counts().reset_index().sort_values(by="count", ascending=False)
-                st.write(f"Contagem dos {corte} NDs Mais Repetidas")
-                st.write(contagem_valores.head(corte))
+            st.divider()
 
-      
-        st.divider()
+            st.write('### Análise Por Totais')
+            # Criar colunas
+            col1, col2 = st.columns([3,2])
 
-        st.write('### Análise Por Totais')
-        # Criar colunas
-        col1, col2 = st.columns([3,2])
+            # Tabela de distribuição observada
+            with col1:
+                with st.expander('Soma dos Valores por Credor'):
+                    soma_credor = df.groupby('Nome do Credor')['Valor'].sum().reset_index().sort_values(by="Valor", ascending=False)
+                    st.write("### Soma dos Valores por Credor")
+                    st.write(soma_credor)
 
-        # Tabela de distribuição observada
-        with col1:
-            with st.expander('Soma dos Valores por Credor'):
-                soma_credor = df.groupby('Nome do Credor')['Valor'].sum().reset_index().sort_values(by="Valor", ascending=False)
-                st.write("### Soma dos Valores por Credor")
-                st.write(soma_credor)
+            # Tabela de distribuição esperada pela Lei de Benford
+            with col2:
+                with st.expander('Soma dos Valores por Natureza'):
+                    soma_nd = df.groupby('Natureza')['Valor'].sum().reset_index().sort_values(by="Valor", ascending=False)
+                    st.write("### Soma dos Valores por Natureza")
+                    st.write(soma_nd)
 
-        # Tabela de distribuição esperada pela Lei de Benford
-        with col2:
-            with st.expander('Soma dos Valores por Natureza'):
-                soma_nd = df.groupby('Natureza')['Valor'].sum().reset_index().sort_values(by="Valor", ascending=False)
-                st.write("### Soma dos Valores por Natureza")
-                st.write(soma_nd)
+            st.divider()
+            
+            ################################################################################################################################
+            # Criando uma coluna cópia
+            df['valores'] = df['Valor']
+            # Converter os valores float para string
+            df['valores_str'] = df['valores'].astype(str)
+            df['valores_str'] = df['valores_str'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-        st.divider()
-        
-        ################################################################################################################################
-        # Criando uma coluna cópia
-        df['valores'] = df['Valor']
-        # Converter os valores float para string
-        df['valores_str'] = df['valores'].astype(str)
-        df['valores_str'] = df['valores_str'].astype(str).str.replace(r'\.0$', '', regex=True)
+            ########################################################################################################################333333
+            # Criar um selectbox para escolher o dígito inicial
+            st.write('### Análise da Distribuição dos Valores por Dígito')
+            digito_inicial = st.selectbox('Escolha o dígito inicial para análise', [str(i) for i in range(1, 10)])
 
-        ########################################################################################################################333333
-        # Criar um selectbox para escolher o dígito inicial
-        st.write('### Análise da Distribuição dos Valores por Dígito')
-        digito_inicial = st.selectbox('Escolha o dígito inicial para análise', [str(i) for i in range(1, 10)])
+            # Filtrar valores que começam com o dígito selecionado
+            filtro_digito = df['valores_str'].str.startswith(digito_inicial)
+            valores_comecam_com_digito = df[filtro_digito]
 
-        # Filtrar valores que começam com o dígito selecionado
-        filtro_digito = df['valores_str'].str.startswith(digito_inicial)
-        valores_comecam_com_digito = df[filtro_digito]
+            valores_digito = valores_comecam_com_digito['Valor']
 
-        valores_digito = valores_comecam_com_digito['Valor']
+            # Definir intervalos dinamicamente com base no dígito inicial
+            base = int(digito_inicial)
+            intervalos = [(base * 10**i, (base + 1) * 10**i) for i in range(7)]  # Ajustar para incluir o valor final
 
-        # Definir intervalos dinamicamente com base no dígito inicial
-        base = int(digito_inicial)
-        intervalos = [(base * 10**i, (base + 1) * 10**i) for i in range(7)]  # Ajustar para incluir o valor final
+            # Criar histogramas separados para cada segmento
+            fig, axs = plt.subplots(len(intervalos) - 1, 1, figsize=(8, 4 * (len(intervalos) - 1)))
 
-        # Criar histogramas separados para cada segmento
-        fig, axs = plt.subplots(len(intervalos) - 1, 1, figsize=(8, 4 * (len(intervalos) - 1)))
+            for i, (inicio, fim) in enumerate(intervalos):
+                if inicio == 1 and fim == 10:
+                    continue  # Pular o intervalo de 1 a 9
 
-        for i, (inicio, fim) in enumerate(intervalos):
-            if inicio == 1 and fim == 10:
-                continue  # Pular o intervalo de 1 a 9
+                valores_intervalo = [valor for valor in valores_digito if inicio <= valor < fim]
+                # Calcular o passo do range, garantindo que não seja zero
+                step = max((fim - inicio) // 10, 1)
+                if valores_intervalo:  # Verificar se há valores para plotar
+                    axs[i - 1].hist(valores_intervalo, bins=range(int(inicio), int(fim) + 1, step), color='skyblue', edgecolor='black', alpha=0.7)
+                    axs[i - 1].set_title(f'Valores entre {inicio} e {fim - 1}')
+                    axs[i - 1].set(xlabel='Valor do Empenho', ylabel='Frequência')
+                    axs[i - 1].yaxis.get_major_locator().set_params(integer=True)
 
-            valores_intervalo = [valor for valor in valores_digito if inicio <= valor < fim]
-            # Calcular o passo do range, garantindo que não seja zero
-            step = max((fim - inicio) // 10, 1)
-            if valores_intervalo:  # Verificar se há valores para plotar
-                axs[i - 1].hist(valores_intervalo, bins=range(int(inicio), int(fim) + 1, step), color='skyblue', edgecolor='black', alpha=0.7)
-                axs[i - 1].set_title(f'Valores entre {inicio} e {fim - 1}')
-                axs[i - 1].set(xlabel='Valor do Empenho', ylabel='Frequência')
-                axs[i - 1].yaxis.get_major_locator().set_params(integer=True)
+            plt.tight_layout()
 
-        plt.tight_layout()
+            # Exibir o gráfico no Streamlit
+            st.pyplot(fig)
 
-        # Exibir o gráfico no Streamlit
-        st.pyplot(fig)
 
 
 
