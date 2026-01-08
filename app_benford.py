@@ -72,8 +72,19 @@ def analises_geral():
         st.write('CARREGUE O ARQUIVO')
 
     else:
+        try:
+            # Tenta ler o arquivo Excel (funciona para .xlsx e .xls)
+            df = pd.read_excel(upload_file)
+        except Exception as e:
+            st.error(f"Erro ao ler o arquivo: {str(e)}")
+            st.info("Certifique-se de que o arquivo é um Excel válido (.xls ou .xlsx)")
+            return
 
-        df = pd.read_excel(upload_file)
+        if df.empty:
+            st.warning("O arquivo está vazio!")
+            return
+
+        df = df.copy()  # Criar uma cópia para evitar warnings
 
         with st.expander("Expandir Dataframe"):
             st.write(df)
@@ -235,8 +246,19 @@ def analises_empenho():
         st.write('CARREGUE O ARQUIVO')
 
     else:
+        try:
+            # Tenta ler o arquivo Excel (funciona para .xlsx e .xls)
+            df = pd.read_excel(upload_file1, header=3)
+        except Exception as e:
+            st.error(f"Erro ao ler o arquivo: {str(e)}")
+            st.info("Certifique-se de que o arquivo é um Excel válido (.xls ou .xlsx)")
+            return
 
-        df = pd.read_excel(upload_file1, header=3)
+        if df.empty:
+            st.warning("O arquivo está vazio!")
+            return
+
+        df = df.copy()  # Criar uma cópia para evitar warnings
         df = df.iloc[:-3]
         # Filtrando as linhas que não terminam com 'P'
         df = df[~df['Número'].str.endswith('P')]
